@@ -21,6 +21,7 @@ function watchify (files, opts) {
     var pending = false;
     var changingDeps = {};
     var first = true;
+    var changedSinceLastBundle = {};
     
     if (opts.cache) {
         cache = opts.cache;
@@ -94,6 +95,7 @@ function watchify (files, opts) {
             delete fwatcherFiles[id];
         }
         changingDeps[id] = true
+        changedSinceLastBundle[id] = true;
         
         // wait for the disk/editor to quiet down first:
         if (!pending) setTimeout(function () {
@@ -113,6 +115,7 @@ function watchify (files, opts) {
     };
     
     b.bundle = function (opts_, cb) {
+        var errored = false;
         if (b._pending) return bundle(opts_, cb);
         
         if (typeof opts_ === 'function') {
@@ -139,11 +142,13 @@ function watchify (files, opts) {
                         else setTimeout(f, opts.delay || 600)
                     });
                 })();
-            }
-
-            // Rewatch errored files
-            if (err.filename) {
-                watchFile(err.filename);
+            } else {
+              // Rewatch all files changed since last bundle
+              // As an error was likely introduced in them
+              for (var id in changedSinceLastBundle) {
+                  watchFile(id);
+              }
+              errored = true;
             }
         });
         
@@ -154,6 +159,7 @@ function watchify (files, opts) {
         
         function end () {
             first = false;
+            if (!errored) changedSinceLastBundle = {};
             
             var delta = ((Date.now() - start) / 1000).toFixed(2);
             b.emit('log', bytes + ' bytes written (' + delta + ' seconds)');
