@@ -140,6 +140,11 @@ function watchify (files, opts) {
                     });
                 })();
             }
+
+            // Rewatch errored files
+            if (err.filename) {
+                watchFile(err.filename);
+            }
         });
         
         var start = Date.now();
